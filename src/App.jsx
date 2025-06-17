@@ -641,7 +641,18 @@ function App() {
               <div className="text-center max-w-2xl mx-auto">
                 <div className="text-2xl font-bold text-white mb-4">{results.message}</div>
                 {results.subtext && (
-                  <div className="text-lg text-gray-400">{results.subtext}</div>
+                  <div className="text-lg text-gray-400 mb-6">{results.subtext}</div>
+                )}
+                {/* If no unmatched followers, show Review Followers button here */}
+                {(!results.notFollowingBack?.length && !results.youDontFollowBack?.length) && (
+                  <div className="flex justify-center mt-6 mb-4">
+                    <button
+                      onClick={() => setShowCleanupTool(!showCleanupTool)}
+                      className="btn-primary text-base px-6 py-3 rounded-lg shadow-md"
+                    >
+                      Review followers
+                    </button>
+                  </div>
                 )}
               </div>
             ) : null}
@@ -694,6 +705,72 @@ function App() {
                 )}
               </div>
             )}
+            {/* Review followers button below results if there are unmatched followers */}
+            {(results.notFollowingBack?.length > 0 || results.youDontFollowBack?.length > 0) && (
+              <div className="flex justify-center mt-10 mb-4">
+                <button
+                  onClick={() => setShowCleanupTool(!showCleanupTool)}
+                  className="btn-primary text-base px-6 py-3 rounded-lg shadow-md"
+                >
+                  Review followers
+                </button>
+              </div>
+            )}
+            {/* Expanded following list (cleanup tool) directly after the button, not at the bottom */}
+            {showCleanupTool && (
+              <div className="mt-6 max-w-2xl mx-auto">
+                <div className="bg-gray-900 rounded-xl p-6">
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+                    <p className="text-blue-600 dark:text-blue-400 text-sm">
+                      We'll never judge. This is your space to reflect and keep your feed meaningful.
+                    </p>
+                  </div>
+                  {/* Search Bar */}
+                  <div className="relative mb-6">
+                    <input
+                      type="text"
+                      placeholder="Search usernames..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent"
+                    />
+                    <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
+                  </div>
+                  {/* Following List */}
+                  <div className="space-y-2">
+                    {isLoadingFollowing ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
+                        <p className="mt-2 text-gray-400">Loading your following list...</p>
+                      </div>
+                    ) : followingList.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-400">We couldn't detect any accounts you follow. Try re-uploading your export file.</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-[60vh] overflow-y-auto pr-2">
+                        {followingList
+                          .filter(user => user.toLowerCase().includes(searchTerm.toLowerCase()))
+                          .map((username, index) => (
+                            <a
+                              key={index}
+                              href={`https://instagram.com/${username}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block p-3 hover:bg-gray-800 rounded-lg transition-colors group"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-white group-hover:text-teal-400 transition-colors">@{username}</span>
+                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-teal-400 transition-colors" />
+                              </div>
+                            </a>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -713,28 +790,15 @@ function App() {
           </ol>
         </section>
 
-        {/* Mobile Screenshot Section */}
-        <section className="py-16">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-3xl font-semibold text-white text-center">Built for your phone, too</h2>
-            <p className="text-lg text-gray-400 text-center mt-2 mb-10">Everything works in your browser. No logins, no downloads.</p>
-            <div className="flex flex-col md:flex-row gap-6 justify-center items-start mt-6">
-              {/* Step 1 */}
-              <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile1.png" alt="Step 1 – Upload your files" className="rounded-lg w-full object-cover text-lg" />
-                <p className="mt-2 text-sm text-gray-400">Step 1 – Upload your files</p>
-              </div>
-              {/* Step 2 */}
-              <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile2.png" alt="Step 2 – Confirm your data" className="rounded-lg w-full object-cover text-lg" />
-                <p className="mt-2 text-sm text-gray-400">Step 2 – Confirm your data</p>
-              </div>
-              {/* Step 3 */}
-              <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile3.png" alt="Step 3 – See your results" className="rounded-lg w-full object-cover text-lg" />
-                <p className="mt-2 text-sm text-gray-400">Step 3 – See your results</p>
-              </div>
-            </div>
+        {/* Mobile Screenshot Section (replace with GIF demo) */}
+        <section className="py-8 md:py-12">
+          <div className="max-w-2xl mx-auto flex flex-col items-center">
+            <img
+              src="/Demo.gif"
+              alt="Demo showing Instagram data file upload"
+              className="rounded-xl w-full max-w-md object-cover shadow-lg border border-gray-800"
+              style={{ margin: '0 auto' }}
+            />
           </div>
         </section>
 
@@ -769,82 +833,6 @@ function App() {
             Made with privacy in mind. No data leaves your browser.<br />
           </div>
         </footer>
-
-        {/* Cleanup Tool Section */}
-        {results && (
-          <div className="mt-12 max-w-2xl mx-auto">
-            <button
-              onClick={() => setShowCleanupTool(!showCleanupTool)}
-              className="w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-all duration-200 flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-3">
-                <Filter className="w-5 h-5 text-teal-400" />
-                <div className="text-left">
-                  <div className="text-lg font-semibold text-white">Review Your Following List</div>
-                  <div className="text-sm text-gray-400">Take a moment to reflect on who you follow</div>
-                </div>
-              </div>
-              <div className="text-gray-400 group-hover:text-white transition-colors">
-                {showCleanupTool ? 'Hide' : 'Show'}
-              </div>
-        </button>
-
-            {showCleanupTool && (
-              <div className="mt-6 bg-gray-900 rounded-xl p-6">
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
-                  <p className="text-blue-600 dark:text-blue-400 text-sm">
-                    We'll never judge. This is your space to reflect and keep your feed meaningful.
-        </p>
-      </div>
-
-                {/* Search Bar */}
-                <div className="relative mb-6">
-                  <input
-                    type="text"
-                    placeholder="Search usernames..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent"
-                  />
-                  <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
-                </div>
-
-                {/* Following List */}
-                <div className="space-y-2">
-                  {isLoadingFollowing ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
-                      <p className="mt-2 text-gray-400">Loading your following list...</p>
-                    </div>
-                  ) : followingList.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-gray-400">We couldn't detect any accounts you follow. Try re-uploading your export file.</p>
-                    </div>
-                  ) : (
-                    <div className="max-h-[60vh] overflow-y-auto pr-2">
-                      {followingList
-                        .filter(user => user.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((username, index) => (
-                          <a
-                            key={index}
-                            href={`https://instagram.com/${username}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-3 hover:bg-gray-800 rounded-lg transition-colors group"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-white group-hover:text-teal-400 transition-colors">@{username}</span>
-                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-teal-400 transition-colors" />
-                            </div>
-                          </a>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Error Toast */}
         {error && (
