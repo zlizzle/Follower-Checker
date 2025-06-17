@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
 import debounce from 'lodash/debounce'
+import JSZip from 'jszip'
 
 const MAX_FILE_SIZE_MB = 5; // 5MB per file
 const MAX_TOTAL_ENTRIES = 20000; // 10k per file, 20k total
@@ -126,20 +127,46 @@ function App() {
     setIsLoadingFollowing(true);
     
     try {
-      const newFiles = Array.from(files);
-      
-      // Check if this is a folder upload
-      const isFolder = newFiles.some(file => file.webkitRelativePath?.includes('/'));
-      setIsFolderUpload(isFolder);
-      
-      // Filter valid files
-      const validFiles = newFiles.filter(file => {
-        const path = file.webkitRelativePath || file.name;
-        return path.includes(EXPORT_FOLDER) && isValidFile(file);
-      });
-      
-      if (validFiles.length === 0) {
-        throw new Error('No valid files found. Please make sure you\'re uploading the followers_and_following folder or the correct JSON files.');
+      let validFiles = [];
+      let isZip = false;
+      // Check for .zip file
+      if (files.length === 1 && files[0].name.endsWith('.zip')) {
+        isZip = true;
+        const zip = await JSZip.loadAsync(files[0]);
+        // Find all relevant JSON files in followers_and_following/
+        const jsonFiles = Object.keys(zip.files).filter(
+          (path) =>
+            path.startsWith('followers_and_following/') &&
+            (path.endsWith('following.json') ||
+              (/followers_\d+\.json$/.test(path)))
+        );
+        if (jsonFiles.length === 0) {
+          throw new Error('No valid files found in the zip. Please upload the original Instagram export.');
+        }
+        // Convert to File objects
+        for (const path of jsonFiles) {
+          const fileData = await zip.files[path].async('blob');
+          const file = new File([fileData], path.split('/').pop(), { type: 'application/json' });
+          validFiles.push(file);
+        }
+      } else {
+        // Not a zip: fallback to folder or manual file upload
+        const newFiles = Array.from(files);
+        // Check if this is a folder upload
+        const isFolder = newFiles.some(file => file.webkitRelativePath?.includes('/'));
+        setIsFolderUpload(isFolder);
+        // Filter valid files
+        validFiles = newFiles.filter(file => {
+          const path = file.webkitRelativePath || file.name;
+          return path.includes(EXPORT_FOLDER) && isValidFile(file);
+        });
+        if (validFiles.length === 0) {
+          // Fallback: allow manual file selection
+          validFiles = newFiles.filter(isValidFile);
+        }
+        if (validFiles.length === 0) {
+          throw new Error('No valid files found. Please upload the Instagram zip, folder, or the correct JSON files.');
+        }
       }
       
       // Separate following and followers files
@@ -238,16 +265,18 @@ function App() {
   }
 
   const handleDrop = (e) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    // Only allow .json files
-    const files = Array.from(e.dataTransfer.files)
-    if (files.some(f => !f.name.endsWith('.json'))) {
-      showToast('Only .json files are allowed.', 'error')
-      return
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    // Allow .zip, folders, and .json
+    const hasZip = files.some(f => f.name.endsWith('.zip'));
+    const hasJson = files.some(f => f.name.endsWith('.json'));
+    if (!hasZip && !hasJson && !files.some(f => f.webkitRelativePath)) {
+      showToast('Please upload a .zip, folder, or .json files from your Instagram export.', 'error');
+      return;
     }
-    handleFileUpload(e.dataTransfer.files)
-  }
+    handleFileUpload(e.dataTransfer.files);
+  };
 
   const toggleUserChecked = (username) => {
     const newChecked = new Set(checkedUsers)
@@ -424,6 +453,9 @@ function App() {
 
           {/* Upload Area */}
           <div className="mt-6 border-dashed border-2 border-teal-400 rounded-xl shadow-md hover:shadow-lg transition bg-gray-900 p-6 flex flex-col items-center">
+            <div className="text-lg font-semibold text-white mb-2">Drop your entire Instagram folder or .zip file here</div>
+            <div className="text-sm text-gray-400 mb-2">Can't upload a folder or zip? You can still upload individual files — just include all followers_1.json, followers_2.json, and following.json files.</div>
+            <div className="text-xs text-gray-500 mb-4">Most users should upload the .zip file or folder that Instagram gives you. If that doesn't work, you can upload the files manually.</div>
             {/* Upload UI (drag/drop or browse) */}
             <div
               className={`upload-zone ${isDragOver ? 'dragover' : ''} transition-all duration-200 ease-in-out ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
@@ -465,7 +497,7 @@ function App() {
                 type="file"
                 multiple
                 webkitdirectory={supportsFolders && !showFallback}
-                accept=".json"
+                accept=".json,.zip"
                 onChange={(e) => handleFileUpload(e.target.files)}
                 className="hidden"
               />
@@ -492,7 +524,7 @@ function App() {
         {/* Instructional Section: How to Download Your Instagram Data */}
         <section className={`bg-gray-900 rounded-2xl shadow-lg shadow-white/5 ring-1 ring-white/10 p-8 max-w-2xl mx-auto mb-16 mt-12 transition-opacity duration-1000 ${showInstructionsFade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} instruction-section`}> 
           <h2 className="text-2xl font-bold text-white mb-2">How to Download Your Instagram Data</h2>
-          <p className="text-base text-gray-400 mb-6">These steps work the same on your phone or desktop. You don't need to log in here. Just upload your own data.</p>
+          <p className="text-base text-gray-400 mb-6">After you request your data from Instagram, you will receive a zip file. You can upload it directly without unzipping. We will automatically extract and use the files we need.<br /><br />We only use the following.json file and any files named followers_1.json, followers_2.json, etc. Don't worry if your download includes other files — we ignore them.<br /><br />If you have a lot of followers, Instagram will split them into multiple files like followers_1.json, followers_2.json, and so on. Be sure to include all of them when uploading individually.<br /><br />If you're on iPhone, tap and hold the zip file in your Files app, then choose 'Uncompress' to create a folder if you want to upload that instead.</p>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
             <button
               onClick={handleCopySteps}

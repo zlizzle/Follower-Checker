@@ -15,7 +15,8 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-window": "^1.8.11",
-    "lucide-react": "^0.330.0"
+    "lucide-react": "^0.330.0",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",
