@@ -29,8 +29,8 @@ const findValidFiles = (files) => {
   const validFiles = [];
   for (const file of files) {
     const path = file.webkitRelativePath || file.name;
-    // Check if file is in the expected directory structure
-    if (path.includes(EXPORT_FOLDER) && isValidFile(file)) {
+    // Accept files if they're in the expected directory OR if they're valid files directly
+    if ((path.includes(EXPORT_FOLDER) && isValidFile(file)) || isValidFile(file)) {
       validFiles.push(file);
     }
   }
@@ -54,6 +54,29 @@ const processInstagramData = async (file) => {
     console.error('Error processing file:', file.name, e);
     throw new Error(`Could not process ${file.name}. Make sure it's a valid Instagram export file.`);
   }
+};
+
+// Helper to extract files from ZIP
+const extractFilesFromZip = async (zip) => {
+  const validFiles = [];
+  const jsonFiles = Object.keys(zip.files).filter(path => path.endsWith('.json'));
+  
+  console.log('Found JSON files in zip:', jsonFiles);
+  
+  for (const path of jsonFiles) {
+    try {
+      const fileData = await zip.files[path].async('blob');
+      const fileName = path.split('/').pop();
+      const file = new File([fileData], fileName, { type: 'application/json' });
+      if (isValidFile(file)) {
+        validFiles.push(file);
+      }
+    } catch (e) {
+      console.error('Error extracting file from zip:', path, e);
+    }
+  }
+  
+  return validFiles;
 };
 
 function App() {
@@ -169,27 +192,7 @@ function App() {
       if (files.length === 1 && files[0].name.endsWith('.zip')) {
         console.log('Processing zip file:', files[0].name);
         const zip = await JSZip.loadAsync(files[0]);
-        
-        // Find all JSON files in the zip
-        const jsonFiles = Object.keys(zip.files).filter(
-          path => path.endsWith('.json')
-        );
-        
-        console.log('Found JSON files in zip:', jsonFiles);
-        
-        if (jsonFiles.length === 0) {
-          throw new Error('No JSON files found in the zip. Please upload the original Instagram export.');
-        }
-        
-        // Convert to File objects and filter valid ones
-        for (const path of jsonFiles) {
-          const fileData = await zip.files[path].async('blob');
-          const fileName = path.split('/').pop();
-          const file = new File([fileData], fileName, { type: 'application/json' });
-          if (isValidFile(file)) {
-            validFiles.push(file);
-          }
-        }
+        validFiles = await extractFilesFromZip(zip);
         
         if (validFiles.length === 0) {
           throw new Error('We couldn\'t find the follower or following files inside your upload. Make sure the Instagram export is unzipped or structured like your original download.');
@@ -907,6 +910,38 @@ function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {error && (
+          <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+            <div className="bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="flex-1">{error}</p>
+              <button 
+                onClick={() => setError(null)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Warning Toast */}
+        {warning && (
+          <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+            <div className="bg-yellow-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="flex-1">{warning}</p>
+              <button 
+                onClick={() => setWarning(null)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         )}
       </main>
