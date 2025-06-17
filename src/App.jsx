@@ -610,11 +610,12 @@ function App() {
           {/* How it works / FAQ link */}
           <div className="mb-4">
             <button
-              className="text-teal-400 hover:underline text-sm font-medium focus:outline-none"
+              className="text-teal-400 hover:underline text-sm font-medium focus:outline-none flex items-center gap-1"
               onClick={() => setShowHelp(v => !v)}
               aria-expanded={showHelp}
               aria-controls="privacy-faq"
             >
+              <Info className="w-4 h-4" />
               How does this work?
             </button>
             {showHelp && (
