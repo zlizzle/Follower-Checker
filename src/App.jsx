@@ -124,6 +124,7 @@ function App() {
   const handleFileUpload = useCallback(async (files) => {
     if (!files?.length) return;
     
+    console.log('Processing files:', Array.from(files).map(f => f.name));
     setIsProcessing(true);
     setError(null);
     setWarning(null);
@@ -132,10 +133,13 @@ function App() {
     try {
       let validFiles = [];
       let isZip = false;
+
       // Check for .zip file
       if (files.length === 1 && files[0].name.endsWith('.zip')) {
+        console.log('Processing zip file:', files[0].name);
         isZip = true;
         const zip = await JSZip.loadAsync(files[0]);
+        
         // Find all relevant JSON files in followers_and_following/
         const jsonFiles = Object.keys(zip.files).filter(
           (path) =>
@@ -143,9 +147,13 @@ function App() {
             (path.endsWith('following.json') ||
               (/followers_\d+\.json$/.test(path)))
         );
+        
+        console.log('Found JSON files in zip:', jsonFiles);
+        
         if (jsonFiles.length === 0) {
           throw new Error('No valid files found in the zip. Please upload the original Instagram export.');
         }
+        
         // Convert to File objects
         for (const path of jsonFiles) {
           const fileData = await zip.files[path].async('blob');
@@ -153,28 +161,35 @@ function App() {
           validFiles.push(file);
         }
       } else {
-        // Not a zip: fallback to folder or manual file upload
+        // Not a zip: handle folder or manual file upload
+        console.log('Processing folder or individual files');
         const newFiles = Array.from(files);
+        
         // Check if this is a folder upload
         const isFolder = newFiles.some(file => file.webkitRelativePath?.includes('/'));
         setIsFolderUpload(isFolder);
+        
         // Filter valid files
         validFiles = newFiles.filter(file => {
           const path = file.webkitRelativePath || file.name;
-          return path.includes(EXPORT_FOLDER) && isValidFile(file);
+          const isValid = path.includes(EXPORT_FOLDER) ? isValidFile(file) : isValidFile(file);
+          console.log('Checking file:', path, 'isValid:', isValid);
+          return isValid;
         });
-        if (validFiles.length === 0) {
-          // Fallback: allow manual file selection
-          validFiles = newFiles.filter(isValidFile);
-        }
+        
         if (validFiles.length === 0) {
           throw new Error('No valid files found. Please upload the Instagram zip, folder, or the correct JSON files.');
         }
       }
       
+      console.log('Valid files found:', validFiles.map(f => f.name));
+      
       // Separate following and followers files
       const followingFiles = validFiles.filter(isFollowingFile);
       const followersFiles = validFiles.filter(isFollowersFile);
+      
+      console.log('Following files:', followingFiles.map(f => f.name));
+      console.log('Followers files:', followersFiles.map(f => f.name));
       
       // Check for missing files
       if (!followingFiles.length) {
@@ -239,6 +254,7 @@ function App() {
       }
       
     } catch (err) {
+      console.error('Error processing files:', err);
       setError(err.message);
       setResults(null);
       setFollowingList([]);
@@ -271,14 +287,25 @@ function App() {
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
+    console.log('Dropped files:', files.map(f => f.name));
+    
     // Allow .zip, folders, and .json
     const hasZip = files.some(f => f.name.endsWith('.zip'));
     const hasJson = files.some(f => f.name.endsWith('.json'));
-    if (!hasZip && !hasJson && !files.some(f => f.webkitRelativePath)) {
+    const hasFolder = files.some(f => f.webkitRelativePath);
+    
+    if (!hasZip && !hasJson && !hasFolder) {
       showToast('Please upload a .zip, folder, or .json files from your Instagram export.', 'error');
       return;
     }
+    
     handleFileUpload(e.dataTransfer.files);
+  };
+
+  const handleFileSelect = (e) => {
+    const files = e.target.files;
+    console.log('Selected files:', Array.from(files).map(f => f.name));
+    handleFileUpload(files);
   };
 
   const toggleUserChecked = (username) => {
@@ -495,7 +522,7 @@ function App() {
                   multiple
                   webkitdirectory={supportsFolders && !showFallback}
                   accept=".json,.zip"
-                  onChange={(e) => handleFileUpload(e.target.files)}
+                  onChange={handleFileSelect}
                   className="hidden"
                 />
                 
