@@ -544,6 +544,31 @@ function App() {
     if (results) setError(null);
   }, [results]);
 
+  // Utility: Open Instagram profile in app if mobile, fallback to web
+  const openInstagramProfile = (username, event) => {
+    if (event) event.preventDefault();
+    const appUrl = `instagram://user?username=${username}`;
+    const webUrl = `https://instagram.com/${username}`;
+    // Only attempt deep link on mobile
+    if (isMobile) {
+      const now = Date.now();
+      // Create a hidden iframe for iOS, or use window.location for Android
+      let didOpen = false;
+      const timeout = setTimeout(() => {
+        if (!didOpen) window.open(webUrl, '_blank');
+      }, 700);
+      // Try to open the app
+      window.location = appUrl;
+      // If the app opens, the page will lose focus
+      window.addEventListener('blur', () => {
+        didOpen = true;
+        clearTimeout(timeout);
+      }, { once: true });
+    } else {
+      window.open(webUrl, '_blank');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Navigation Header */}
@@ -713,14 +738,15 @@ function App() {
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {results.notFollowingBack.map((username, idx) => (
                         <div key={username + idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <a
-                            href={`https://instagram.com/${username}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
+                          <button
+                            onClick={(e) => openInstagramProfile(username, e)}
+                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0 focus:outline-none focus:ring-2 focus:ring-teal-400 rounded px-0"
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                            aria-label={`Open @${username} on Instagram`}
+                            tabIndex={0}
                           >
                             <span className="truncate">@{username}</span>
-                          </a>
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -735,14 +761,15 @@ function App() {
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {results.youDontFollowBack.map((username, idx) => (
                         <div key={username + idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <a
-                            href={`https://instagram.com/${username}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
+                          <button
+                            onClick={(e) => openInstagramProfile(username, e)}
+                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0 focus:outline-none focus:ring-2 focus:ring-teal-400 rounded px-0"
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                            aria-label={`Open @${username} on Instagram`}
+                            tabIndex={0}
                           >
                             <span className="truncate">@{username}</span>
-                          </a>
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -797,18 +824,19 @@ function App() {
                         {followingList
                           .filter(user => user.toLowerCase().includes(searchTerm.toLowerCase()))
                           .map((username, index) => (
-                            <a
+                            <button
                               key={index}
-                              href={`https://instagram.com/${username}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block p-3 hover:bg-gray-800 rounded-lg transition-colors group"
+                              onClick={(e) => openInstagramProfile(username, e)}
+                              className="block w-full text-left p-3 hover:bg-gray-800 rounded-lg transition-colors group focus:outline-none focus:ring-2 focus:ring-teal-400"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                              aria-label={`Open @${username} on Instagram`}
+                              tabIndex={0}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-white group-hover:text-teal-400 transition-colors">@{username}</span>
                                 <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-teal-400 transition-colors" />
                               </div>
-                            </a>
+                            </button>
                           ))}
                       </div>
                     )}
