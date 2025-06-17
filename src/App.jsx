@@ -24,6 +24,38 @@ const isFollowingFile = (file) => file.name === FOLLOWING_FILE;
 const isFollowersFile = (file) => file.name.startsWith(FOLLOWERS_PREFIX) && file.name.endsWith('.json');
 const isValidFile = (file) => isFollowingFile(file) || isFollowersFile(file);
 
+// Helper to find valid files in a directory structure
+const findValidFiles = (files) => {
+  const validFiles = [];
+  for (const file of files) {
+    const path = file.webkitRelativePath || file.name;
+    // Check if file is in the expected directory structure
+    if (path.includes(EXPORT_FOLDER) && isValidFile(file)) {
+      validFiles.push(file);
+    }
+  }
+  return validFiles;
+};
+
+// Helper to process Instagram JSON data
+const processInstagramData = async (file) => {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    
+    // Validate Instagram data structure
+    if (!data.relationships_following?.string_list_data?.value && 
+        !data.relationships_followers?.string_list_data?.value) {
+      throw new Error('Invalid Instagram data format');
+    }
+    
+    return data;
+  } catch (e) {
+    console.error('Error processing file:', file.name, e);
+    throw new Error(`Could not process ${file.name}. Make sure it's a valid Instagram export file.`);
+  }
+};
+
 function App() {
   console.log('App component mounted');
   
@@ -132,36 +164,38 @@ function App() {
     
     try {
       let validFiles = [];
-      let isZip = false;
-
+      
       // Check for .zip file
       if (files.length === 1 && files[0].name.endsWith('.zip')) {
         console.log('Processing zip file:', files[0].name);
-        isZip = true;
         const zip = await JSZip.loadAsync(files[0]);
         
-        // Find all relevant JSON files in followers_and_following/
+        // Find all JSON files in the zip
         const jsonFiles = Object.keys(zip.files).filter(
-          (path) =>
-            path.startsWith('followers_and_following/') &&
-            (path.endsWith('following.json') ||
-              (/followers_\d+\.json$/.test(path)))
+          path => path.endsWith('.json')
         );
         
         console.log('Found JSON files in zip:', jsonFiles);
         
         if (jsonFiles.length === 0) {
-          throw new Error('No valid files found in the zip. Please upload the original Instagram export.');
+          throw new Error('No JSON files found in the zip. Please upload the original Instagram export.');
         }
         
-        // Convert to File objects
+        // Convert to File objects and filter valid ones
         for (const path of jsonFiles) {
           const fileData = await zip.files[path].async('blob');
-          const file = new File([fileData], path.split('/').pop(), { type: 'application/json' });
-          validFiles.push(file);
+          const fileName = path.split('/').pop();
+          const file = new File([fileData], fileName, { type: 'application/json' });
+          if (isValidFile(file)) {
+            validFiles.push(file);
+          }
+        }
+        
+        if (validFiles.length === 0) {
+          throw new Error('We couldn\'t find the follower or following files inside your upload. Make sure the Instagram export is unzipped or structured like your original download.');
         }
       } else {
-        // Not a zip: handle folder or manual file upload
+        // Handle folder or individual file upload
         console.log('Processing folder or individual files');
         const newFiles = Array.from(files);
         
@@ -169,16 +203,11 @@ function App() {
         const isFolder = newFiles.some(file => file.webkitRelativePath?.includes('/'));
         setIsFolderUpload(isFolder);
         
-        // Filter valid files
-        validFiles = newFiles.filter(file => {
-          const path = file.webkitRelativePath || file.name;
-          const isValid = path.includes(EXPORT_FOLDER) ? isValidFile(file) : isValidFile(file);
-          console.log('Checking file:', path, 'isValid:', isValid);
-          return isValid;
-        });
+        // Find valid files
+        validFiles = findValidFiles(newFiles);
         
         if (validFiles.length === 0) {
-          throw new Error('No valid files found. Please upload the Instagram zip, folder, or the correct JSON files.');
+          throw new Error('We couldn\'t find the follower or following files inside your upload. Make sure the Instagram export is unzipped or structured like your original download.');
         }
       }
       
@@ -199,29 +228,19 @@ function App() {
         throw new Error('We need at least one followers_*.json file to compare.');
       }
       
-      // Validate each file
-      for (const file of validFiles) {
-        validateFileType(file);
-        const data = await validateFileContent(file);
-        validateInstagramFormat(data);
-      }
-      
-      // Update file count
-      setUploadedFileCount(validFiles.length);
-      
       // Process files
       let following = [];
       let followers = [];
       
-      for (const file of validFiles) {
-        const data = await validateFileContent(file);
-        if (isFollowingFile(file)) {
-          following = deduplicateUsernames(data.relationships_following.string_list_data.value);
-          // Set following list for cleanup tool
-          setFollowingList(following);
-        } else if (isFollowersFile(file)) {
-          followers = [...followers, ...data.relationships_followers.string_list_data.value];
-        }
+      // Process following file
+      const followingData = await processInstagramData(followingFiles[0]);
+      following = deduplicateUsernames(followingData.relationships_following.string_list_data.value);
+      setFollowingList(following);
+      
+      // Process followers files
+      for (const file of followersFiles) {
+        const data = await processInstagramData(file);
+        followers = [...followers, ...data.relationships_followers.string_list_data.value];
       }
       
       // Check for empty states
