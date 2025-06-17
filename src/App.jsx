@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter, Info } from 'lucide-react'
+import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter, Info, Lock } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
 import JSZip from 'jszip'
 
@@ -561,7 +561,52 @@ function App() {
       <main className="max-w-4xl mx-auto py-24 px-6">
         <div className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">See who's not following you back</h1>
+          {/* Privacy-first reassurance */}
+          <div className="flex flex-col items-center gap-2 mb-4">
+            <div className="text-base text-green-400 font-medium">Your data never leaves your device.</div>
+            <div className="text-sm text-gray-400">We don't track you, collect anything, or send files anywhere.</div>
+            {/* Visual privacy badge */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 mt-2">
+              <span className="flex items-center gap-1 bg-gray-800 text-green-400 px-3 py-1 rounded-full text-xs font-semibold border border-green-700">
+                <Lock className="w-4 h-4 inline-block mr-1 text-green-400" />
+                Works 100% in your browser
+              </span>
+              <span className="flex items-center gap-1 bg-gray-800 text-green-400 px-3 py-1 rounded-full text-xs font-semibold border border-green-700">
+                <Check className="w-4 h-4 inline-block mr-1 text-green-400" />
+                No login required
+              </span>
+              <span className="flex items-center gap-1 bg-gray-800 text-green-400 px-3 py-1 rounded-full text-xs font-semibold border border-green-700">
+                <Shield className="w-4 h-4 inline-block mr-1 text-green-400" />
+                No data collection
+              </span>
+            </div>
+          </div>
           <p className="text-base text-gray-400 mb-2 md:mb-4">Just drop your Instagram zip file or the JSON files here. We'll handle the rest. Your data stays on your device.</p>
+          {/* How it works / FAQ link */}
+          <div className="mb-4">
+            <button
+              className="text-teal-400 hover:underline text-sm font-medium focus:outline-none"
+              onClick={() => setShowHelp(v => !v)}
+              aria-expanded={showHelp}
+              aria-controls="privacy-faq"
+            >
+              How does this work?
+            </button>
+            {showHelp && (
+              <div id="privacy-faq" className="mt-2 bg-gray-800 rounded p-4 text-sm text-gray-300 max-w-md mx-auto text-left shadow-lg border border-gray-700">
+                <div className="mb-2 font-semibold text-teal-300">Why do I need to upload my data?</div>
+                <div className="mb-2">
+                  Instagram doesn't let third-party tools access your follower info directly.<br />
+                  This tool uses the official data download that you request from Instagram. No login or scraping needed.
+                </div>
+                <div className="mb-2 font-semibold text-teal-300">How it works</div>
+                <div>
+                  You download your data from Instagram, then upload it here.<br />
+                  Everything is processed right in your browser. Nothing is sent anywhere.
+                </div>
+              </div>
+            )}
+          </div>
           <div className="mt-0 border-dashed border-2 border-teal-400 rounded-xl shadow-md hover:shadow-lg transition bg-gray-900 p-6 flex flex-col items-center">
             {/* Upload UI (drag/drop or browse) */}
             <div className="w-full flex flex-col items-center">
