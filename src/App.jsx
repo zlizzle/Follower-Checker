@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter, Info } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
-import debounce from 'lodash/debounce'
 import JSZip from 'jszip'
 
 const MAX_FILE_SIZE_MB = 5; // 5MB per file
@@ -12,25 +11,36 @@ const BATCH_SIZE = 1000; // Process users in batches
 const FOLLOWERS_PREFIX = 'followers_';
 const FOLLOWING_FILE = 'following.json';
 const EXPORT_FOLDER = 'followers_and_following';
+const ERROR_FOLDER_DROP = "It looks like you dragged a folder. For privacy reasons, browsers only allow folder uploads using the 'browse files' button. Please click 'browse files' and select your folder, or drag the inner 'followers_and_following' folder instead.";
 
-// Browser support detection
-const supportsFolderUpload = () => {
-  const input = document.createElement('input');
-  return 'webkitdirectory' in input;
-};
+// Simple debounce implementation
+function debounce(func, wait) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 // File filtering utilities
 const isFollowingFile = (file) => file.name === FOLLOWING_FILE;
-const isFollowersFile = (file) => file.name.startsWith(FOLLOWERS_PREFIX) && file.name.endsWith('.json');
+const isFollowersFile = (file) => {
+  // Match followers_1.json, followers_2.json, etc.
+  const match = file.name.match(/^followers_\d+\.json$/);
+  return match !== null;
+};
 const isValidFile = (file) => isFollowingFile(file) || isFollowersFile(file);
 
 // Helper to find valid files in a directory structure
 const findValidFiles = (files) => {
   const validFiles = [];
   for (const file of files) {
-    const path = file.webkitRelativePath || file.name;
-    // Accept files if they're in the expected directory OR if they're valid files directly
-    if ((path.includes(EXPORT_FOLDER) && isValidFile(file)) || isValidFile(file)) {
+    const path = file.name;
+    if (
+      file.name === 'following.json' ||
+      /^followers_\d+\.json$/.test(file.name) ||
+      file.name.endsWith('.zip')
+    ) {
       validFiles.push(file);
     }
   }
@@ -43,15 +53,30 @@ const processInstagramData = async (file) => {
     const text = await file.text();
     const data = JSON.parse(text);
     
-    // Validate Instagram data structure
-    if (!data.relationships_following?.string_list_data?.value && 
-        !data.relationships_followers?.string_list_data?.value) {
-      throw new Error('Invalid Instagram data format');
+    // Log the data structure for debugging
+    console.log('Processing file:', file.name, 'Type:', Array.isArray(data) ? 'array' : typeof data, 'Keys:', Array.isArray(data) ? undefined : Object.keys(data));
+    
+    // Check for Instagram's data structure
+    if (isFollowingFile(file)) {
+      if (!data.relationships_following || !Array.isArray(data.relationships_following)) {
+        console.error('Invalid following data structure:', data);
+        throw new Error('Invalid following data format');
+      }
+    } else if (isFollowersFile(file)) {
+      if (!Array.isArray(data)) {
+        console.error('Invalid followers data structure:', data);
+        throw new Error('Invalid followers data format');
+      }
+      // Debug: log the first item
+      console.log('Sample followers item:', data[0]);
     }
     
     return data;
   } catch (e) {
     console.error('Error processing file:', file.name, e);
+    if (e instanceof SyntaxError) {
+      throw new Error(`Could not parse ${file.name}. Make sure it's a valid JSON file.`);
+    }
     throw new Error(`Could not process ${file.name}. Make sure it's a valid Instagram export file.`);
   }
 };
@@ -68,6 +93,10 @@ const extractFilesFromZip = async (zip) => {
       const fileData = await zip.files[path].async('blob');
       const fileName = path.split('/').pop();
       const file = new File([fileData], fileName, { type: 'application/json' });
+      
+      // Log file details for debugging
+      console.log('Checking file:', fileName, 'isValid:', isValidFile(file));
+      
       if (isValidFile(file)) {
         validFiles.push(file);
       }
@@ -88,11 +117,8 @@ function App() {
   const [uploadedFiles, setUploadedFiles] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // State for folder upload
-  const [supportsFolders, setSupportsFolders] = useState(true);
+  // State for upload
   const [uploadedFileCount, setUploadedFileCount] = useState(0);
-  const [isFolderUpload, setIsFolderUpload] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
 
   // Cleanup Tool states
   const [showCleanupTool, setShowCleanupTool] = useState(false);
@@ -129,6 +155,14 @@ function App() {
 
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showIphoneTip, setShowIphoneTip] = useState(false);
+
+  // Add scroll to results after upload
+  const resultsRef = useRef(null);
+  useEffect(() => {
+    if (results && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [results]);
 
   useEffect(() => {
     if (results) setShowResults(true);
@@ -198,17 +232,10 @@ function App() {
           throw new Error('We couldn\'t find the follower or following files inside your upload. Make sure the Instagram export is unzipped or structured like your original download.');
         }
       } else {
-        // Handle folder or individual file upload
-        console.log('Processing folder or individual files');
+        // Handle individual file upload
+        console.log('Processing individual files');
         const newFiles = Array.from(files);
-        
-        // Check if this is a folder upload
-        const isFolder = newFiles.some(file => file.webkitRelativePath?.includes('/'));
-        setIsFolderUpload(isFolder);
-        
-        // Find valid files
         validFiles = findValidFiles(newFiles);
-        
         if (validFiles.length === 0) {
           throw new Error('We couldn\'t find the follower or following files inside your upload. Make sure the Instagram export is unzipped or structured like your original download.');
         }
@@ -228,7 +255,7 @@ function App() {
         throw new Error('We need your following.json file to compare.');
       }
       if (!followersFiles.length) {
-        throw new Error('We need at least one followers_*.json file to compare.');
+        throw new Error('We need at least one followers_1.json file to compare.');
       }
       
       // Process files
@@ -237,13 +264,26 @@ function App() {
       
       // Process following file
       const followingData = await processInstagramData(followingFiles[0]);
-      following = deduplicateUsernames(followingData.relationships_following.string_list_data.value);
+      // following.json is an object with relationships_following array
+      following = deduplicateUsernames(
+        followingData.relationships_following.flatMap(item =>
+          Array.isArray(item.string_list_data)
+            ? item.string_list_data.map(entry => entry.value)
+            : []
+        )
+      );
       setFollowingList(following);
       
       // Process followers files
       for (const file of followersFiles) {
         const data = await processInstagramData(file);
-        followers = [...followers, ...data.relationships_followers.string_list_data.value];
+        // followers_1.json is an array of objects with string_list_data arrays
+        const theseFollowers = data.flatMap(item =>
+          Array.isArray(item.string_list_data)
+            ? item.string_list_data.map(entry => entry.value)
+            : []
+        );
+        followers = [...followers, ...theseFollowers];
       }
       
       // Check for empty states
@@ -264,15 +304,31 @@ function App() {
       
       // Compare lists
       const notFollowingBack = following.filter(user => !followers.includes(user));
+      const youDontFollowBack = followers.filter(user => !following.includes(user));
       
-      if (notFollowingBack.length === 0) {
-        setResults({ 
-          notFollowingBack: [], 
-          message: 'Everyone you follow follows you back. Your circle is complete.',
-          subtext: 'Nice work. Looks like you\'ve curated your feed with intention.'
+      if (notFollowingBack.length === 0 && youDontFollowBack.length === 0) {
+        setResults({
+          notFollowingBack: [],
+          youDontFollowBack: [],
+          message: "Everyone you follow follows you back, and you follow everyone who follows you. That's a perfect match! Your Instagram circle is in total harmony.",
+          subtext: "Nice work! Looks like you keep your connections intentional and mutual."
+        });
+      } else if (notFollowingBack.length === 0) {
+        setResults({
+          notFollowingBack: [],
+          youDontFollowBack,
+          message: "Everyone you follow follows you back. Your circle is complete!",
+          subtext: "No loose ends here. You're keeping it mutual."
+        });
+      } else if (youDontFollowBack.length === 0) {
+        setResults({
+          notFollowingBack,
+          youDontFollowBack: [],
+          message: "You follow some people who don't follow you back.",
+          subtext: "Scroll down to see who they are."
         });
       } else {
-        setResults({ notFollowingBack });
+        setResults({ notFollowingBack, youDontFollowBack });
       }
       
     } catch (err) {
@@ -280,19 +336,10 @@ function App() {
       setError(err.message);
       setResults(null);
       setFollowingList([]);
-      // Show fallback if folder upload fails
-      if (isFolderUpload) {
-        setShowFallback(true);
-      }
     } finally {
       setIsProcessing(false);
       setIsLoadingFollowing(false);
     }
-  }, [isFolderUpload]);
-
-  // Check browser support on mount
-  useEffect(() => {
-    setSupportsFolders(supportsFolderUpload());
   }, []);
 
   const handleDragOver = (e) => {
@@ -305,23 +352,33 @@ function App() {
     setIsDragOver(false)
   }
 
+  useEffect(() => {
+    const onGlobalDrop = (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length === 0) {
+        e.preventDefault();
+        setError(ERROR_FOLDER_DROP);
+        setTimeout(() => setError(null), 7000);
+      }
+    };
+    window.addEventListener('drop', onGlobalDrop);
+    return () => window.removeEventListener('drop', onGlobalDrop);
+  }, []);
+
   const handleDrop = (e) => {
+    console.log('Drop event fired', e);
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
     console.log('Dropped files:', files.map(f => f.name));
-    
-    // Allow .zip, folders, and .json
+    // Only allow .zip and .json files
     const hasZip = files.some(f => f.name.endsWith('.zip'));
     const hasJson = files.some(f => f.name.endsWith('.json'));
-    const hasFolder = files.some(f => f.webkitRelativePath);
-    
-    if (!hasZip && !hasJson && !hasFolder) {
-      showToast('Please upload a .zip, folder, or .json files from your Instagram export.', 'error');
+    if (!hasZip && !hasJson) {
+      setError('Please upload your Instagram zip file or the JSON files named following.json and followers_1.json, followers_2.json, and so on.');
+      setTimeout(() => setError(null), 7000);
       return;
     }
-    
-    handleFileUpload(e.dataTransfer.files);
+    handleFileUpload(files);
   };
 
   const handleFileSelect = (e) => {
@@ -482,6 +539,11 @@ function App() {
     return unique;
   };
 
+  // On successful upload, clear error
+  useEffect(() => {
+    if (results) setError(null);
+  }, [results]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Navigation Header */}
@@ -498,62 +560,47 @@ function App() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto py-24 px-6">
         <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Upload your data folder or zip</h1>
-          <p className="text-base text-gray-400 mb-4">Drag and drop your Instagram zip, folder, or files here.</p>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">See who's not following you back</h1>
+          <p className="text-base text-gray-400 mb-2 md:mb-4">Just drop your Instagram zip file or the JSON files here. We'll handle the rest. Your data stays on your device.</p>
           <div className="mt-0 border-dashed border-2 border-teal-400 rounded-xl shadow-md hover:shadow-lg transition bg-gray-900 p-6 flex flex-col items-center">
             {/* Upload UI (drag/drop or browse) */}
             <div className="w-full flex flex-col items-center">
               <div
-                className={`upload-zone ${isDragOver ? 'dragover' : ''} transition-all duration-200 ease-in-out ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`upload-zone ${isDragOver ? 'dragover' : ''} transition-all duration-200 ease-in-out ${isProcessing ? 'opacity-50 pointer-events-none' : ''} text-lg`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 tabIndex={0}
-                style={{ fontSize: '1.1rem' }}
+                style={{ paddingTop: '1.5rem', paddingBottom: '1.5rem' }}
               >
-                {isFolderUpload ? (
-                  <Folder className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
-                ) : (
-                  <Upload className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
-                )}
+                <Upload className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
                 <p className="text-xl font-bold text-white mb-2">
-                  {isFolderUpload ? '📁 Drop your followers_and_following folder here' : '📁 Drop your folder here'}
+                  📂 Drop your Instagram zip or JSON files here
                 </p>
                 <p className="text-base text-white mb-4">
                   or <button className="text-teal-400 hover:underline font-medium transition-all duration-200 ease-in-out" onClick={() => fileInputRef.current && fileInputRef.current.click()}>browse files</button>
                 </p>
-                <p className="text-base text-teal-400 text-center mt-2">
-                  {isFolderUpload ? (
-                    'Upload the entire followers_and_following folder. We\'ll find the right files.'
-                  ) : (
-                    'Just upload the files named following.json and any others starting with followers. Don\'t worry, we\'ll handle the rest.'
-                  )}
-                </p>
-                
                 {/* File Count Display */}
                 {uploadedFileCount > 0 && (
                   <div className="mt-4 text-sm text-teal-400">
                     Found {uploadedFileCount} valid file{uploadedFileCount !== 1 ? 's' : ''}
                   </div>
                 )}
-                
                 {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  webkitdirectory={supportsFolders && !showFallback}
                   accept=".json,.zip"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
-                
                 {results && (
                   <div className="mt-4 text-green-400 text-sm font-semibold">Files uploaded successfully! You can now review your results below.</div>
                 )}
               </div>
-              <div className="mt-3 text-xs text-gray-400">
-                Can't upload a folder or zip? <span className="font-semibold">Select your following.json and all followers_1.json, followers_2.json files.</span>
+              <div className="mt-3 text-sm text-green-400 text-center max-w-xs mx-auto">
+                We only need following.json and any followers_1.json, followers_2.json, and so on. You can upload the zip or just those files. We ignore everything else.
               </div>
               <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none" onClick={() => setShowMoreInfo(v => !v)}>
                 <Info className="w-4 h-4 inline-block" />
@@ -561,21 +608,22 @@ function App() {
                 <span className={`transition-transform duration-200 ${showMoreInfo ? 'rotate-180' : ''}`}>▾</span>
               </div>
               {showMoreInfo && (
-                <div className="mt-2 bg-gray-800 rounded p-3 text-xs text-gray-300 text-left max-w-md mx-auto">
+                <div className="mt-2 bg-gray-800 rounded p-3 text-xs text-gray-300 text-left max-w-md mx-auto transition-all duration-300">
                   <div className="mb-1 font-semibold text-teal-300">What files do I need?</div>
                   <ul className="list-disc list-inside ml-4 mb-2">
                     <li>following.json</li>
-                    <li>followers_1.json, followers_2.json, ...</li>
+                    <li>followers_1.json, followers_2.json, and so on</li>
                   </ul>
-                  <div className="mb-2">We ignore all other files in your export.</div>
-                  <div className="mb-1 font-semibold text-teal-300">Tips</div>
+                  <div className="mb-1 font-semibold text-teal-300">You can upload:</div>
+                  <ul className="list-disc list-inside ml-4 mb-2">
+                    <li>The Instagram zip file</li>
+                    <li>Or just the above JSON files directly</li>
+                  </ul>
+                  <div className="mb-1 font-semibold text-teal-300">Tips:</div>
                   <ul className="list-disc list-inside ml-4">
-                    <li>If you have a lot of followers, Instagram splits them into multiple files. Upload all of them.</li>
-                    <li className="underline cursor-pointer text-teal-400" onClick={e => { e.stopPropagation(); setShowIphoneTip(v => !v); }}>How to unzip on iPhone?</li>
+                    <li>If you have a lot of followers, Instagram splits them into multiple files like followers_1.json, followers_2.json, etc. Make sure to include all of them.</li>
+                    <li>We ignore any other files from your export, so don't worry about them.</li>
                   </ul>
-                  {showIphoneTip && (
-                    <div className="mt-2 text-gray-400">In the Files app, tap and hold the zip file, then choose 'Uncompress' to create a folder you can upload.</div>
-                  )}
                 </div>
               )}
             </div>
@@ -585,6 +633,70 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Results Section - moved up, right after upload UI */}
+        {results && (
+          <div ref={resultsRef} className={`transition-all duration-700 ease-in-out ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} py-20`} id="results-section">
+            {results.message ? (
+              <div className="text-center max-w-2xl mx-auto">
+                <div className="text-2xl font-bold text-white mb-4">{results.message}</div>
+                {results.subtext && (
+                  <div className="text-lg text-gray-400">{results.subtext}</div>
+                )}
+              </div>
+            ) : null}
+            {/* Results Tabs */}
+            {(results.notFollowingBack?.length > 0 || results.youDontFollowBack?.length > 0) && (
+              <div className="flex flex-col md:flex-row gap-8 mt-10">
+                {results.notFollowingBack?.length > 0 && (
+                  <div className="flex-1">
+                    <div className="mb-4 flex items-center gap-2">
+                      <UserX className="w-6 h-6 text-red-500" />
+                      <h3 className="heading-3">Users you follow who don't follow you back ({results.notFollowingBack.length})</h3>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {results.notFollowingBack.map((username, idx) => (
+                        <div key={username + idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                          <a
+                            href={`https://instagram.com/${username}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
+                          >
+                            <span className="truncate">@{username}</span>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {results.youDontFollowBack?.length > 0 && (
+                  <div className="flex-1">
+                    <div className="mb-4 flex items-center gap-2">
+                      <UserCheck className="w-6 h-6 text-green-500" />
+                      <h3 className="heading-3">Users who follow you that you don't follow back ({results.youDontFollowBack.length})</h3>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {results.youDontFollowBack.map((username, idx) => (
+                        <div key={username + idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                          <a
+                            href={`https://instagram.com/${username}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
+                          >
+                            <span className="truncate">@{username}</span>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Visual divider */}
         <div className="my-10 mx-auto max-w-2xl border-t border-white/10 opacity-40" />
         {/* Instructions Section */}
@@ -597,6 +709,7 @@ function App() {
             <li><span className="font-bold text-teal-300 mr-2">4.</span> Scroll down and check only <span className="font-semibold">Connections → Followers and Following</span>.</li>
             <li><span className="font-bold text-teal-300 mr-2">5.</span> Tap <span className="font-semibold">Next</span>, then set <span className="font-semibold">Format: JSON</span> and <span className="font-semibold">Destination: Download to device</span>.</li>
             <li><span className="font-bold text-teal-300 mr-2">6.</span> Tap <span className="font-semibold">Create files</span>. Instagram will prepare the download.</li>
+            <li><span className="font-bold text-teal-300 mr-2">7.</span> When your download is ready, upload the zip file here. If you unzip it, just select the files named following.json and followers_1.json, followers_2.json, and so on.</li>
           </ol>
         </section>
 
@@ -608,202 +721,22 @@ function App() {
             <div className="flex flex-col md:flex-row gap-6 justify-center items-start mt-6">
               {/* Step 1 */}
               <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile1.png" alt="Step 1 – Upload your files" className="rounded-lg w-full object-cover" style={{ fontSize: '1.1rem' }} />
+                <img src="/mobile1.png" alt="Step 1 – Upload your files" className="rounded-lg w-full object-cover text-lg" />
                 <p className="mt-2 text-sm text-gray-400">Step 1 – Upload your files</p>
               </div>
               {/* Step 2 */}
               <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile2.png" alt="Step 2 – Confirm your data" className="rounded-lg w-full object-cover" style={{ fontSize: '1.1rem' }} />
+                <img src="/mobile2.png" alt="Step 2 – Confirm your data" className="rounded-lg w-full object-cover text-lg" />
                 <p className="mt-2 text-sm text-gray-400">Step 2 – Confirm your data</p>
               </div>
               {/* Step 3 */}
               <div className="w-full md:w-1/3 p-4 bg-zinc-800 rounded-xl shadow-md text-center flex flex-col items-center">
-                <img src="/mobile3.png" alt="Step 3 – See your results" className="rounded-lg w-full object-cover" style={{ fontSize: '1.1rem' }} />
+                <img src="/mobile3.png" alt="Step 3 – See your results" className="rounded-lg w-full object-cover text-lg" />
                 <p className="mt-2 text-sm text-gray-400">Step 3 – See your results</p>
               </div>
             </div>
           </div>
         </section>
-
-        {/* Results Section */}
-        {results && (
-          <div className={`transition-all duration-700 ease-in-out ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} py-20`}>
-            {results.message ? (
-              <div className="text-center max-w-2xl mx-auto">
-                <div className="text-2xl font-bold text-white mb-4">{results.message}</div>
-                {results.subtext && (
-                  <div className="text-lg text-gray-400">{results.subtext}</div>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="mb-8 text-center text-green-400 text-lg font-semibold">You're all set! Review your results below.</div>
-                {/* Progress Tracker */}
-                <div className="card">
-                  <h3 className="heading-3 mb-2">Progress</h3>
-                  <p className="text-body">{getProgressText()}</p>
-                  <div className="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-teal-500 h-2 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${results.notFollowingBack.length + results.youDontFollowBack.length > 0 
-                          ? (checkedUsers.size / (results.notFollowingBack.length + results.youDontFollowBack.length)) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* Not Following Back */}
-                <div className="card">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 space-y-2 md:space-y-0">
-                    <div className="flex items-center">
-                      <UserX className="w-6 h-6 text-red-500 mr-2" />
-                      <h3 className="heading-3">
-                        Users you follow who don't follow you back ({notFollowingBackList.length})
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => debouncedCopyUsernames(notFollowingBackList)}
-                        className="btn-secondary flex items-center text-sm"
-                      >
-                        <Copy className="w-4 h-4 mr-1" />
-                        Copy All
-                      </button>
-                      <button
-                        onClick={() => debouncedDownloadCSV(notFollowingBackList, 'not-following-back.csv')}
-                        className="btn-secondary flex items-center text-sm"
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        CSV
-                      </button>
-                      <button
-                        onClick={() => openNextProfile(notFollowingBackList)}
-                        className="btn-primary flex items-center text-sm"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-1" />
-                        Open Next Profile
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {notFollowingBackList.length > 100 ? (
-                    <List
-                      height={400}
-                      itemCount={notFollowingBackList.length}
-                      itemSize={56}
-                      width="100%"
-                      itemData={notFollowingBackList}
-                    >
-                      {props => (
-                        <VirtualizedRow
-                          {...props}
-                          type="notFollowingBack"
-                          checkedUsers={checkedUsers}
-                          toggleUserChecked={toggleUserChecked}
-                        />
-                      )}
-                    </List>
-                  ) : (
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {notFollowingBackList.map((username) => (
-                        <div key={username} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <div className="flex items-center min-w-0 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={checkedUsers.has(username)}
-                              onChange={() => toggleUserChecked(username)}
-                              className="mr-3 rounded border-gray-300 dark:border-gray-600 text-teal-500 focus:ring-teal-500 flex-shrink-0"
-                            />
-                            <a
-                              href={`https://instagram.com/${username}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
-                            >
-                              <span className="truncate">@{username}</span>
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* You Don't Follow Back */}
-                <div className="card">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 space-y-2 md:space-y-0">
-                    <div className="flex items-center">
-                      <UserCheck className="w-6 h-6 text-green-500 mr-2" />
-                      <h3 className="heading-3">
-                        Users who follow you that you don't follow back ({youDontFollowBackList.length})
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => debouncedCopyUsernames(youDontFollowBackList)}
-                        className="btn-secondary flex items-center text-sm"
-                      >
-                        <Copy className="w-4 h-4 mr-1" />
-                        Copy All
-                      </button>
-                      <button
-                        onClick={() => debouncedDownloadCSV(youDontFollowBackList, 'you-dont-follow-back.csv')}
-                        className="btn-secondary flex items-center text-sm"
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        CSV
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {youDontFollowBackList.length > 100 ? (
-                    <List
-                      height={400}
-                      itemCount={youDontFollowBackList.length}
-                      itemSize={56}
-                      width="100%"
-                      itemData={youDontFollowBackList}
-                    >
-                      {props => (
-                        <VirtualizedRow
-                          {...props}
-                          type="youDontFollowBack"
-                          checkedUsers={checkedUsers}
-                          toggleUserChecked={toggleUserChecked}
-                        />
-                      )}
-                    </List>
-                  ) : (
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {youDontFollowBackList.map((username) => (
-                        <div key={username} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <div className="flex items-center min-w-0 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={checkedUsers.has(username)}
-                              onChange={() => toggleUserChecked(username)}
-                              className="mr-3 rounded border-gray-300 dark:border-gray-600 text-teal-500 focus:ring-teal-500 flex-shrink-0"
-                            />
-                            <a
-                              href={`https://instagram.com/${username}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium flex items-center min-w-0"
-                            >
-                              <span className="truncate">@{username}</span>
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
         {/* Toast */}
         {toast && (
@@ -830,8 +763,8 @@ function App() {
             </a>
             <a href="https://buymeacoffee.com/slizzle" target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 transition-all duration-200 ease-in-out flex items-center gap-1">
               <span>☕</span> Buy me a coffee
-            </a>
-          </div>
+        </a>
+      </div>
           <div className="text-xs text-gray-400 text-center">
             Made with privacy in mind. No data leaves your browser.<br />
           </div>
@@ -854,15 +787,15 @@ function App() {
               <div className="text-gray-400 group-hover:text-white transition-colors">
                 {showCleanupTool ? 'Hide' : 'Show'}
               </div>
-            </button>
+        </button>
 
             {showCleanupTool && (
               <div className="mt-6 bg-gray-900 rounded-xl p-6">
                 <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
                   <p className="text-blue-600 dark:text-blue-400 text-sm">
                     We'll never judge. This is your space to reflect and keep your feed meaningful.
-                  </p>
-                </div>
+        </p>
+      </div>
 
                 {/* Search Bar */}
                 <div className="relative mb-6">
@@ -916,7 +849,7 @@ function App() {
         {/* Error Toast */}
         {error && (
           <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
-            <div className="bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md">
+            <div className="bg-red-600 text-white border border-red-700 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md" style={{ backgroundColor: '#dc2626', borderColor: '#991b1b', opacity: 1 }}>
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <p className="flex-1">{error}</p>
               <button 
