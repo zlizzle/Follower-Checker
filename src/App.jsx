@@ -468,7 +468,7 @@ function App() {
                   <Upload className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
                 )}
                 <p className="text-xl font-bold text-white mb-2">
-                  {isFolderUpload ? '📁 Drop your followers_and_following folder here' : '📁 Drop your files here'}
+                  {isFolderUpload ? '📁 Drop your followers_and_following folder here' : '📁 Drop your folder here'}
                 </p>
                 <p className="text-base text-white mb-4">
                   or <button className="text-teal-400 hover:underline font-medium transition-all duration-200 ease-in-out" onClick={() => fileInputRef.current && fileInputRef.current.click()}>browse files</button>
@@ -477,7 +477,7 @@ function App() {
                   {isFolderUpload ? (
                     'Upload the entire followers_and_following folder. We\'ll find the right files.'
                   ) : (
-                    'Upload following.json and all followers_*.json files. Don\'t worry, we\'ll handle the rest.'
+                    'Just upload the files named following.json and any others starting with followers. Don\'t worry, we\'ll handle the rest.'
                   )}
                 </p>
                 
