@@ -608,7 +608,7 @@ function App() {
           </div>
           <p className="text-base text-gray-400 mb-2 md:mb-4">Just drop your Instagram zip file or the JSON files here. We'll handle the rest. Your data stays on your device.</p>
           {/* How it works / FAQ link */}
-          <div className="mb-4">
+          <div className="mb-4 flex justify-center">
             <button
               className="text-teal-400 hover:underline text-sm font-medium focus:outline-none flex items-center gap-1"
               onClick={() => setShowHelp(v => !v)}
@@ -616,7 +616,7 @@ function App() {
               aria-controls="privacy-faq"
             >
               <Info className="w-4 h-4" />
-              How does this work?
+              How does this work? <span className="text-gray-400">(click me 👈)</span>
             </button>
             {showHelp && (
               <div id="privacy-faq" className="mt-2 bg-gray-800 rounded p-4 text-sm text-gray-300 max-w-md mx-auto text-left shadow-lg border border-gray-700">
