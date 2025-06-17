@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter } from 'lucide-react'
+import { Shield, Upload, Users, UserCheck, UserX, Copy, Download, RefreshCw, ExternalLink, Heart, Github, Coffee, X, Search, Check, AlertCircle, Folder, Filter, Info } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
 import debounce from 'lodash/debounce'
 import JSZip from 'jszip'
@@ -71,6 +71,9 @@ function App() {
 
   // Add fade-in state for instructions
   const [showInstructionsFade, setShowInstructionsFade] = useState(false);
+
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [showIphoneTip, setShowIphoneTip] = useState(false);
 
   useEffect(() => {
     if (results) setShowResults(true);
@@ -446,122 +449,105 @@ function App() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto py-24 px-6">
         <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-white">Instagram Follower Checker</h1>
-          <p className="text-lg text-gray-400 mt-2">
-            Find out who's not following you back. No login, no tracking. Your data stays on your device.
-          </p>
-
-          {/* Upload Area */}
-          <div className="mt-6 border-dashed border-2 border-teal-400 rounded-xl shadow-md hover:shadow-lg transition bg-gray-900 p-6 flex flex-col items-center">
-            <div className="text-lg font-semibold text-white mb-2">Drop your entire Instagram folder or .zip file here</div>
-            <div className="text-sm text-gray-400 mb-2">Can't upload a folder or zip? You can still upload individual files — just include all followers_1.json, followers_2.json, and following.json files.</div>
-            <div className="text-xs text-gray-500 mb-4">Most users should upload the .zip file or folder that Instagram gives you. If that doesn't work, you can upload the files manually.</div>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Upload your data folder or zip</h1>
+          <p className="text-base text-gray-400 mb-4">Drag and drop your Instagram zip, folder, or files here.</p>
+          <div className="mt-0 border-dashed border-2 border-teal-400 rounded-xl shadow-md hover:shadow-lg transition bg-gray-900 p-6 flex flex-col items-center">
             {/* Upload UI (drag/drop or browse) */}
-            <div
-              className={`upload-zone ${isDragOver ? 'dragover' : ''} transition-all duration-200 ease-in-out ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              tabIndex={0}
-              style={{ fontSize: '1.1rem' }}
-            >
-              {isFolderUpload ? (
-                <Folder className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
-              ) : (
-                <Upload className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
-              )}
-              <p className="text-xl font-bold text-white mb-2">
-                {isFolderUpload ? '📁 Drop your followers_and_following folder here' : '📁 Drop your files here'}
-              </p>
-              <p className="text-base text-white mb-4">
-                or <button className="text-teal-400 hover:underline font-medium transition-all duration-200 ease-in-out" onClick={() => fileInputRef.current && fileInputRef.current.click()}>browse files</button>
-              </p>
-              <p className="text-base text-teal-400 text-center mt-2">
+            <div className="w-full flex flex-col items-center">
+              <div
+                className={`upload-zone ${isDragOver ? 'dragover' : ''} transition-all duration-200 ease-in-out ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                tabIndex={0}
+                style={{ fontSize: '1.1rem' }}
+              >
                 {isFolderUpload ? (
-                  'Upload the entire followers_and_following folder. We\'ll find the right files.'
+                  <Folder className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
                 ) : (
-                  'Upload following.json and all followers_*.json files. Don\'t worry, we\'ll handle the rest.'
+                  <Upload className={`w-14 h-14 text-teal-400 mx-auto mb-4 transition-all duration-200 ease-in-out hover:scale-105 ${results ? 'animate-bounce' : ''}`} />
                 )}
-              </p>
-              
-              {/* File Count Display */}
-              {uploadedFileCount > 0 && (
-                <div className="mt-4 text-sm text-teal-400">
-                  Found {uploadedFileCount} valid file{uploadedFileCount !== 1 ? 's' : ''}
+                <p className="text-xl font-bold text-white mb-2">
+                  {isFolderUpload ? '📁 Drop your followers_and_following folder here' : '📁 Drop your files here'}
+                </p>
+                <p className="text-base text-white mb-4">
+                  or <button className="text-teal-400 hover:underline font-medium transition-all duration-200 ease-in-out" onClick={() => fileInputRef.current && fileInputRef.current.click()}>browse files</button>
+                </p>
+                <p className="text-base text-teal-400 text-center mt-2">
+                  {isFolderUpload ? (
+                    'Upload the entire followers_and_following folder. We\'ll find the right files.'
+                  ) : (
+                    'Upload following.json and all followers_*.json files. Don\'t worry, we\'ll handle the rest.'
+                  )}
+                </p>
+                
+                {/* File Count Display */}
+                {uploadedFileCount > 0 && (
+                  <div className="mt-4 text-sm text-teal-400">
+                    Found {uploadedFileCount} valid file{uploadedFileCount !== 1 ? 's' : ''}
+                  </div>
+                )}
+                
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  webkitdirectory={supportsFolders && !showFallback}
+                  accept=".json,.zip"
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                  className="hidden"
+                />
+                
+                {results && (
+                  <div className="mt-4 text-green-400 text-sm font-semibold">Files uploaded successfully! You can now review your results below.</div>
+                )}
+              </div>
+              <div className="mt-3 text-xs text-gray-400">
+                Can't upload a folder or zip? <span className="font-semibold">Select your following.json and all followers_1.json, followers_2.json files.</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none" onClick={() => setShowMoreInfo(v => !v)}>
+                <Info className="w-4 h-4 inline-block" />
+                <span>More info</span>
+                <span className={`transition-transform duration-200 ${showMoreInfo ? 'rotate-180' : ''}`}>▾</span>
+              </div>
+              {showMoreInfo && (
+                <div className="mt-2 bg-gray-800 rounded p-3 text-xs text-gray-300 text-left max-w-md mx-auto">
+                  <div className="mb-1 font-semibold text-teal-300">What files do I need?</div>
+                  <ul className="list-disc list-inside ml-4 mb-2">
+                    <li>following.json</li>
+                    <li>followers_1.json, followers_2.json, ...</li>
+                  </ul>
+                  <div className="mb-2">We ignore all other files in your export.</div>
+                  <div className="mb-1 font-semibold text-teal-300">Tips</div>
+                  <ul className="list-disc list-inside ml-4">
+                    <li>If you have a lot of followers, Instagram splits them into multiple files. Upload all of them.</li>
+                    <li className="underline cursor-pointer text-teal-400" onClick={e => { e.stopPropagation(); setShowIphoneTip(v => !v); }}>How to unzip on iPhone?</li>
+                  </ul>
+                  {showIphoneTip && (
+                    <div className="mt-2 text-gray-400">In the Files app, tap and hold the zip file, then choose 'Uncompress' to create a folder you can upload.</div>
+                  )}
                 </div>
               )}
-              
-              {/* Hidden File Input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                webkitdirectory={supportsFolders && !showFallback}
-                accept=".json,.zip"
-                onChange={(e) => handleFileUpload(e.target.files)}
-                className="hidden"
-              />
-              
-              {results && (
-                <div className="mt-4 text-green-400 text-sm font-semibold">Files uploaded successfully! You can now review your results below.</div>
-              )}
             </div>
-
             {/* Ethos line under upload UI */}
-            <div className="mt-3 text-sm italic text-gray-500 text-center">
+            <div className="mt-4 text-sm italic text-gray-500 text-center">
               Your feed should reflect your life, not a number.
-            </div>
-
-            {/* Instructional CTA below upload box */}
-            <div className="mt-4 text-xs text-teal-400 text-center">
-              <button onClick={() => setShowHelp(v => !v)} className="underline focus:outline-none">
-                Don't know how to get your data? See instructions
-              </button>
             </div>
           </div>
         </div>
-
-        {/* Instructional Section: How to Download Your Instagram Data */}
-        <section className={`bg-gray-900 rounded-2xl shadow-lg shadow-white/5 ring-1 ring-white/10 p-8 max-w-2xl mx-auto mb-16 mt-12 transition-opacity duration-1000 ${showInstructionsFade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} instruction-section`}> 
-          <h2 className="text-2xl font-bold text-white mb-2">How to Download Your Instagram Data</h2>
-          <p className="text-base text-gray-400 mb-6">After you request your data from Instagram, you will receive a zip file. You can upload it directly without unzipping. We will automatically extract and use the files we need.<br /><br />We only use the following.json file and any files named followers_1.json, followers_2.json, etc. Don't worry if your download includes other files — we ignore them.<br /><br />If you have a lot of followers, Instagram will split them into multiple files like followers_1.json, followers_2.json, and so on. Be sure to include all of them when uploading individually.<br /><br />If you're on iPhone, tap and hold the zip file in your Files app, then choose 'Uncompress' to create a folder if you want to upload that instead.</p>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-            <button
-              onClick={handleCopySteps}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 text-sm text-teal-300 hover:bg-gray-700 transition-all duration-200"
-              aria-label="Copy these steps"
-            >
-              <span>Copy these steps</span>
-              {copySuccess && <span className="text-teal-400">Copied!</span>}
-            </button>
-          </div>
-          <ol className="space-y-4 text-base text-white">
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">1</span>
-              <span>Go to your Instagram settings:<br /><span className="text-gray-300">Settings and activity → Accounts Center</span></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">2</span>
-              <span>Tap or click:<br /><span className="text-gray-300">Your information and permissions → Download your information</span></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">3</span>
-              <span>Select:<br /><span className="text-gray-300">Download or transfer information → Some of your information</span></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">4</span>
-              <span>Scroll down and check only:<br /><span className="inline-block mt-1 px-2 py-1 bg-gray-800 rounded text-teal-400 font-semibold">Connections → Followers and Following</span></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">5</span>
-              <span>Tap <span className="font-bold">Next</span>, then set:<br />
-                <span className="ml-4">Format: JSON</span><br />
-                <span className="ml-4">Destination: Download to device</span></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-7 h-7 min-w-[1.75rem] min-h-[1.75rem] rounded-full font-bold bg-gray-700 text-white text-base mt-0.5">6</span>
-              <span>Tap <span className="font-bold">Create files</span><br /><span className="text-gray-300">Instagram will prepare the download. It might take a few minutes.</span></span>
-            </li>
+        {/* Visual divider */}
+        <div className="my-10 mx-auto max-w-2xl border-t border-white/10 opacity-40" />
+        {/* Instructions Section */}
+        <section className="bg-gray-900 rounded-2xl shadow-lg shadow-white/5 ring-1 ring-white/10 p-6 max-w-2xl mx-auto mb-16 mt-0 instruction-section">
+          <h2 className="text-xl font-bold text-white mb-4">How to get your Instagram data</h2>
+          <ol className="space-y-3 text-base text-white text-left">
+            <li><span className="font-bold text-teal-300 mr-2">1.</span> Go to <span className="font-semibold">Settings and activity → Accounts Center</span> in Instagram.</li>
+            <li><span className="font-bold text-teal-300 mr-2">2.</span> Tap <span className="font-semibold">Your information and permissions → Download your information</span>.</li>
+            <li><span className="font-bold text-teal-300 mr-2">3.</span> Select <span className="font-semibold">Download or transfer information → Some of your information</span>.</li>
+            <li><span className="font-bold text-teal-300 mr-2">4.</span> Scroll down and check only <span className="font-semibold">Connections → Followers and Following</span>.</li>
+            <li><span className="font-bold text-teal-300 mr-2">5.</span> Tap <span className="font-semibold">Next</span>, then set <span className="font-semibold">Format: JSON</span> and <span className="font-semibold">Destination: Download to device</span>.</li>
+            <li><span className="font-bold text-teal-300 mr-2">6.</span> Tap <span className="font-semibold">Create files</span>. Instagram will prepare the download.</li>
           </ol>
         </section>
 
