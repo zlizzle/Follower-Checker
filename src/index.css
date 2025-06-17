@@ -82,6 +82,10 @@
     @apply text-sm text-gray-500 dark:text-gray-400;
   }
 
+  .instruction-section {
+    @apply p-8;
+  }
+
   /* Mobile-specific improvements */
   @media (max-width: 768px) {
     .btn-primary, .btn-secondary {
@@ -98,6 +102,10 @@
 
     .card {
       @apply p-4;
+    }
+
+    .instruction-section {
+      @apply p-3;
     }
   }
 }
