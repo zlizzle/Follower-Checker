@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    @apply bg-gray-50 dark:bg-gray-900;
+  }
+  
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply text-gray-900 dark:text-gray-100 antialiased;
+  }
+
+  /* Better touch targets for mobile */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent zoom on input focus on iOS */
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-teal-500 hover:bg-teal-600 text-white font-medium py-2.5 px-5 rounded-lg 
+           transition-all duration-200 ease-in-out transform hover:scale-[1.02] 
+           focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 
+           shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 
+           text-gray-700 dark:text-gray-200 font-medium py-2.5 px-5 rounded-lg 
+           transition-all duration-200 ease-in-out border border-gray-200 dark:border-gray-700
+           focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 
+           shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .upload-zone {
+    @apply border-2 border-dashed border-teal-300 dark:border-teal-700 
+           rounded-xl p-8 text-center transition-all duration-200 
+           hover:bg-gray-50 dark:hover:bg-gray-800/50
+           focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2;
+  }
+  
+  .upload-zone.dragover {
+    @apply border-teal-500 dark:border-teal-400 bg-teal-50 dark:bg-teal-900/20;
+  }
+  
+  .toast {
+    @apply fixed bottom-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
+           rounded-lg shadow-lg p-4 max-w-sm animate-slide-up z-50;
+  }
+
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 
+           p-6 transition-all duration-200 hover:shadow-md;
+  }
+
+  .heading-1 {
+    @apply text-3xl font-semibold leading-tight text-gray-900 dark:text-gray-100;
+  }
+
+  .heading-2 {
+    @apply text-2xl font-semibold leading-tight text-gray-900 dark:text-gray-100;
+  }
+
+  .heading-3 {
+    @apply text-xl font-semibold leading-tight text-gray-900 dark:text-gray-100;
+  }
+
+  .text-body {
+    @apply text-base text-gray-700 dark:text-gray-300 leading-relaxed;
+  }
+
+  .text-small {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+  }
+
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    .btn-primary, .btn-secondary {
+      @apply py-3 px-4 text-base w-full sm:w-auto;
+    }
+    
+    .upload-zone {
+      @apply p-6;
+    }
+    
+    .toast {
+      @apply bottom-4 left-4 right-4 max-w-none;
+    }
+
+    .card {
+      @apply p-4;
+    }
+  }
+}
