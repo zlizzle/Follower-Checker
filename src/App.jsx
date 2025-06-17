@@ -68,6 +68,9 @@ function App() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // Add fade-in state for instructions
+  const [showInstructionsFade, setShowInstructionsFade] = useState(false);
+
   useEffect(() => {
     if (results) setShowResults(true);
     else setShowResults(false);
@@ -102,6 +105,11 @@ function App() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    // Fade in on page load
+    setTimeout(() => setShowInstructionsFade(true), 200);
   }, []);
 
   const showToast = (message, type = 'success') => {
@@ -414,12 +422,21 @@ function App() {
             <header className="text-center space-y-6">
               <div className="text-3xl font-bold text-teal-400 tracking-tight mb-2 select-none" style={{fontFamily: 'Inter, sans-serif', letterSpacing: '-0.02em'}}>FollowCheck</div>
               <h1 className="text-4xl font-bold text-white tracking-tight max-w-2xl mx-auto">Instagram Follower Checker</h1>
-              <p className="text-lg text-gray-400 italic text-center max-w-xl mx-auto mt-4">"We built this because your feed should feel like your life, not a list."</p>
+              <p className="text-base text-gray-500 italic text-center max-w-xl mx-auto mt-2 mb-2 truncate" style={{fontWeight: 400, fontSize: '1rem', opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>We built this because your feed should feel like your life, not a list.</p>
               <p className="text-base text-gray-300 max-w-xl mx-auto mt-2 mb-4">See who you follow that isn't following you back. No sign-in needed, and your info stays private on your device.</p>
             </header>
 
+            {/* Visual cue divider */}
+            <hr className="my-10 border-t border-white/10 opacity-40" />
+
+            {/* Transition heading and explanation */}
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-semibold text-white mb-2">Ready to check your followers? Start here:</h2>
+              <p className="text-base text-gray-400">Upload your Instagram data export below. It stays private and only takes a moment.</p>
+            </div>
+
             {/* Instructional Section: How to Download Your Instagram Data */}
-            <section className="bg-gray-900 rounded-2xl shadow-lg shadow-white/5 ring-1 ring-white/10 p-8 max-w-2xl mx-auto mb-16 mt-12">
+            <section className={`bg-gray-900 rounded-2xl shadow-lg shadow-white/5 ring-1 ring-white/10 p-8 max-w-2xl mx-auto mb-16 mt-12 transition-opacity duration-1000 ${showInstructionsFade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}> 
               <h2 className="text-2xl font-bold text-white mb-2">How to Download Your Instagram Data</h2>
               <p className="text-base text-gray-400 mb-6">These steps work the same on your phone or desktop. You don't need to log in here. Just upload your own data.</p>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
@@ -436,83 +453,12 @@ function App() {
                 <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>1</span> <span>Go to your Instagram settings:<br /><span className="text-gray-300">Settings and activity → Accounts Center</span></span></li>
                 <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>2</span> <span>Tap or click:<br /><span className="text-gray-300">Your information and permissions → Download your information</span></span></li>
                 <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>3</span> <span>Select:<br /><span className="text-gray-300">Download or transfer information → Some of your information</span></span></li>
-                <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>4</span> <span>Scroll down and check only:<br /><span className="inline-block mt-1 px-2 py-1 bg-gray-800 rounded text-teal-400 font-semibold">✅ Connections → Followers and Following</span></span></li>
+                <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>4</span> <span>Scroll down and check only:<br /><span className="inline-block mt-1 px-2 py-1 bg-gray-800 rounded text-teal-400 font-semibold">Connections → Followers and Following</span></span></li>
                 <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>5</span> <span>Tap <span className="font-bold">Next</span>, then set:<br />
-                  <span className="ml-4">📄 <span className="font-semibold">Format: JSON</span></span><br />
-                  <span className="ml-4">💾 <span className="font-semibold">Destination: Download to device</span></span></span></li>
+                  <span className="ml-4">Format: JSON</span><br />
+                  <span className="ml-4">Destination: Download to device</span></span></li>
                 <li className="flex items-center gap-2"><span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold ${results ? 'bg-teal-400 text-white' : 'bg-gray-700 text-white'}`}>6</span> <span>Tap <span className="font-bold">Create files</span><br /><span className="text-gray-300">Instagram will prepare the download. It might take a few minutes.</span></span></li>
               </ol>
-              <div className="mt-8 border-t border-white/10 pt-6">
-                <div className="text-base text-white font-bold mb-2">Final Step – Upload Your Files:</div>
-                <ul className="list-disc list-inside text-white space-y-1">
-                  <li>Unzip the file</li>
-                  <li>Open the folder: <span className="font-mono text-teal-400">followers_and_following/</span></li>
-                  <li>Upload the entire folder here:
-                    <ul className="ml-6 list-disc list-inside text-white">
-                      <li>Just drag and drop the <span className="font-mono text-teal-400">followers_and_following</span> folder</li>
-                      <li>Or tap "Browse files" and select the folder</li>
-                    </ul>
-                  </li>
-                </ul>
-                <div className="mt-4 text-sm text-gray-400">
-                  Having trouble? You can also upload the files individually:
-                  <ul className="ml-6 list-disc list-inside mt-1">
-                    <li><span className="font-mono text-teal-400">following.json</span></li>
-                    <li><span className="font-mono text-teal-400">followers_1.json</span></li>
-                    <li className="text-gray-400">(optional) <span className="font-mono text-teal-400">followers_2.json</span>, <span className="font-mono text-teal-400">followers_3.json</span>, etc.</li>
-                  </ul>
-                </div>
-              </div>
-              {/* Trust & File Help Banner */}
-              <div className="mt-8">
-                <button
-                  onClick={() => setShowHelp(v => !v)}
-                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-400 transition-all duration-200 font-semibold focus:outline-none"
-                  aria-expanded={showHelp}
-                  aria-controls="help-panel"
-                >
-                  <span>🙋 Not sure which files to upload?</span>
-                  <span className={`transition-transform duration-200 ${showHelp ? 'rotate-180' : ''}`}>▾</span>
-                </button>
-                <div
-                  id="help-panel"
-                  className={`overflow-hidden transition-all duration-300 ${showHelp ? 'max-h-96 mt-4' : 'max-h-0'} text-sm text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4`}
-                  style={{marginTop: showHelp ? '1rem' : 0, padding: showHelp ? '1rem' : 0}}
-                >
-                  <div>You'll find them inside a folder called:<br /><span className="font-mono text-teal-500">followers_and_following</span></div>
-                  <div className="mt-2">Look for:</div>
-                  <ul className="list-disc list-inside ml-6 mt-1">
-                    <li><span className="font-mono text-teal-500">following.json</span></li>
-                    <li><span className="font-mono text-teal-500">followers_1.json</span> <span className="text-gray-400">(you might also see <span className="font-mono text-teal-500">followers_2.json</span>, etc.)</span></li>
-                  </ul>
-                  <div className="mt-2">✅ You don't need to open or edit these. Just upload them here.</div>
-                  <div className="mt-2">🔒 This tool works entirely in your browser. No data is uploaded or stored.</div>
-                  <div className="mt-2 text-xs text-gray-500">You can't break anything here. If you upload the wrong file, just try again.</div>
-                  <div className="mt-2 text-xs text-teal-400 font-semibold">You're in control.</div>
-                </div>
-              </div>
-              {/* Collapsible Panel for Extra Reassurance */}
-              <div className="mt-6">
-                <button
-                  onClick={() => setFaqOpen(v => !v)}
-                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-400 transition-all duration-200 font-semibold focus:outline-none"
-                  aria-expanded={faqOpen}
-                  aria-controls="faq-panel"
-                >
-                  <span>Still feeling unsure?</span>
-                  <span className={`transition-transform duration-200 ${faqOpen ? 'rotate-180' : ''}`}>▾</span>
-                </button>
-                <div
-                  id="faq-panel"
-                  className={`overflow-hidden transition-all duration-300 ${faqOpen ? 'max-h-96 mt-4' : 'max-h-0'} text-sm text-gray-500 bg-gray-800 rounded-lg p-4`}
-                  style={{marginTop: faqOpen ? '1rem' : 0, padding: faqOpen ? '1rem' : 0}}
-                >
-                  <div>We understand. Uploading anything can feel sketchy.<br /><br />
-                    That's why this tool doesn't ask for a login, doesn't use Instagram's API, and doesn't upload your files.<br /><br />
-                    Everything happens in your browser, and no one (not even us) sees your data. You're simply comparing two lists that you already own.
-                  </div>
-                </div>
-              </div>
             </section>
 
             {/* Upload Section */}
